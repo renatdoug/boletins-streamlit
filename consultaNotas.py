@@ -185,7 +185,7 @@ def display_boletim(resultado):
 
     def colorir_nota(val):
         if isinstance(val, (int, float)):
-            return 'background-color: #ffd6d6; color: black; font-weight: bold; text-align: center' if val < 7 else 'background-color: #d6ecff; color: black; font-weight: bold; text-align: center'
+            return 'background-color: #ffd6d6; color: black; font-weight: bold; text-align: center' if val < 8 else 'background-color: #d6ecff; color: black; font-weight: bold; text-align: center'
         return ''
 
     st.success("Notas encontradas:")
