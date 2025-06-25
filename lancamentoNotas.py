@@ -15,22 +15,29 @@ SCOPE = [
 SHEET_NAME = "Boletins"
 WORKSHEET_NOTAS = "Notas_Tabela"
 WORKSHEET_CONTROLE = "Controle_Liberacao"
-CRED_FILE = "credenciais.json"
 
 # Funções auxiliares
 
 
-def authenticate_gsheets(cred_file):
+def authenticate_gsheets():
     """Autentica com Google Sheets usando credenciais JSON."""
-    if not os.path.exists(cred_file):
-        st.error("Arquivo de credenciais não encontrado.")
-        st.stop()
     try:
-        credentials = Credentials.from_service_account_file(
-            cred_file, scopes=SCOPE)
+        # Localmente, tenta carregar credenciais.json
+        if os.path.exists("credenciais.json"):
+            credentials = Credentials.from_service_account_file(
+                "credenciais.json", scopes=SCOPE)
+        # No Streamlit Cloud, usa st.secrets
+        elif "GOOGLE_CREDENTIALS" in st.secrets:
+            credentials_info = st.secrets["google_credentials"]
+            credentials = Credentials.from_service_account_info(
+                credentials_info, scopes=SCOPE)
+        else:
+            st.error("Credenciais do Google Sheets não encontradas. Verifique se 'credenciais.json' está no diretório do projeto ou se os secrets estão configurados no Streamlit Cloud.")
+            st.stop()
         return gspread.authorize(credentials)
     except Exception as e:
-        st.error(f"Erro ao autenticar com Google Sheets: {e}")
+        st.error(
+            f"Erro ao autenticar com Google Sheets: {e}\n{traceback.format_exc()}")
         st.stop()
 
 
@@ -77,7 +84,8 @@ def load_data(worksheet_name, _cache_version=0):
         st.error(f"Planilha {worksheet_name} não encontrada.")
         return pd.DataFrame(), None, []
     except Exception as e:
-        st.error(f"Erro ao carregar planilha {worksheet_name}: {e}")
+        st.error(
+            f"Erro ao carregar planilha {worksheet_name}: {e}\n{traceback.format_exc()}")
         st.stop()
 
 
@@ -116,7 +124,7 @@ def logout():
 
 # Inicialização
 if "client" not in st.session_state:
-    st.session_state["client"] = authenticate_gsheets(CRED_FILE)
+    st.session_state["client"] = authenticate_gsheets()
 if "cache_version" not in st.session_state:
     st.session_state["cache_version"] = 0
 if "df" not in st.session_state:
@@ -183,7 +191,7 @@ else:
     bimestre = st.selectbox(
         "Bimestre/Período", options=["", "1º", "2º", "3º", "4º", "Final"], index=0, key="bimestre")
     tipo_avaliacao = st.selectbox("Tipo de Avaliação", options=[
-                                  "", "MENSAL", "BIMESTRAL", "RECUPERAÇÃO", "RECUPERAÇÃO FINAL"], index=0, key="tipo_avaliacao")
+                                  "", "MENSAL", "BIMESTRAL", "RECUPERAÇÃO"], index=0, key="tipo_avaliacao")
 
     if not serie or not componente or not bimestre or not tipo_avaliacao:
         st.warning("Por favor, selecione todos os parâmetros de lançamento.")
@@ -299,13 +307,6 @@ else:
                 # Executa atualizações em lote
                 if batch_updates:
                     try:
-                        # Reautentica antes de executar batch_update
-                        st.session_state["client"] = authenticate_gsheets(
-                            CRED_FILE)
-                        sheet_notas = st.session_state["client"].open(
-                            SHEET_NAME).worksheet(WORKSHEET_NOTAS)
-                        # st.write("Batch updates a serem enviados:",
-                        #         batch_updates)  # Log para depuração
                         sheet_notas.batch_update(batch_updates)
                         st.info("Atualizações em lote realizadas com sucesso!")
                     except Exception as e:
@@ -323,8 +324,7 @@ else:
                 # Atualiza cache e dados
                 if batch_updates or registros:
                     st.session_state["cache_version"] += 1
-                    st.session_state["client"] = authenticate_gsheets(
-                        CRED_FILE)
+                    st.session_state["client"] = authenticate_gsheets()
                     st.session_state["df"], st.session_state["sheet_notas"], st.session_state["headers_notas"] = load_data(
                         WORKSHEET_NOTAS, _cache_version=st.session_state["cache_version"])
                     st.session_state["df_periodo"], _, _ = load_data(

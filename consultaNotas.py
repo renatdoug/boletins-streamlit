@@ -5,6 +5,7 @@ from google.oauth2.service_account import Credentials
 import re
 import traceback
 import os
+import json
 
 # Constantes
 SCOPE = [
@@ -13,19 +14,24 @@ SCOPE = [
 ]
 SHEET_NAME = "Boletins"
 WORKSHEET_NOTAS = "Notas_Tabela"
-CRED_FILE = "credenciais.json"
 
 # Funções auxiliares
-def authenticate_gsheets(cred_file):
+def authenticate_gsheets():
     """Autentica com Google Sheets usando credenciais JSON."""
-    if not os.path.exists(cred_file):
-        st.error("Arquivo de credenciais não encontrado.")
-        st.stop()
     try:
-        credentials = Credentials.from_service_account_file(cred_file, scopes=SCOPE)
+        # Localmente, tenta carregar credenciais.json
+        if os.path.exists("credenciais.json"):
+            credentials = Credentials.from_service_account_file("credenciais.json", scopes=SCOPE)
+        # No Streamlit Cloud, usa st.secrets
+        elif "GOOGLE_CREDENTIALS" in st.secrets:
+            credentials_info = st.secrets["google_credentials"]
+            credentials = Credentials.from_service_account_info(credentials_info, scopes=SCOPE)
+        else:
+            st.error("Credenciais do Google Sheets não encontradas. Verifique se 'credenciais.json' está no diretório do projeto ou se os secrets estão configurados no Streamlit Cloud.")
+            st.stop()
         return gspread.authorize(credentials)
     except Exception as e:
-        st.error(f"Erro ao autenticar com Google Sheets: {e}")
+        st.error(f"Erro ao autenticar com Google Sheets: {e}\n{traceback.format_exc()}")
         st.stop()
 
 def clean_nota_value(value):
@@ -146,7 +152,7 @@ def display_boletim(resultado):
 
     def colorir_nota(val):
         if isinstance(val, (int, float)):
-            return 'background-color: #ffd6d6; color: black; font-weight: bold; text-align: center' if val < 8 else 'background-color: #d6ecff; color: black; font-weight: bold; text-align: center'
+            return 'background-color: #ffd6d6; color: black; font-weight: bold; text-align: center' if val < 7 else 'background-color: #d6ecff; color: black; font-weight: bold; text-align: center'
         return ''
 
     st.success("Notas encontradas:")
@@ -169,7 +175,7 @@ def display_boletim(resultado):
 
 # Inicialização
 if "client" not in st.session_state:
-    st.session_state["client"] = authenticate_gsheets(CRED_FILE)
+    st.session_state["client"] = authenticate_gsheets()
 if "cache_version" not in st.session_state:
     st.session_state["cache_version"] = 0
 
