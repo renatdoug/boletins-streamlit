@@ -23,7 +23,7 @@ def authenticate_gsheets():
         if os.path.exists("credenciais.json"):
             credentials = Credentials.from_service_account_file(
                 "credenciais.json", scopes=SCOPE)
-        elif "GOOGLE_CREDENTIALS" in st.secrets:
+        elif "google_credentials" in st.secrets:  # Alterado para minúsculas
             credentials_info = st.secrets["google_credentials"]
             credentials = Credentials.from_service_account_info(
                 credentials_info, scopes=SCOPE)
