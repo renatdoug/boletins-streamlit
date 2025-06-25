@@ -289,19 +289,17 @@ else:
                     bimestre_norm = str(bimestre).strip().upper()
                     tipo_avaliacao_norm = str(tipo_avaliacao).strip().upper()
 
-                    # Busca nota existente (repetido para consistência com cond abaixo)
+                    # Busca nota existente
                     cond = (
                         (df['Matrícula'].str.strip().str.upper() == matricula_norm) &
                         (df['Série'].str.strip().str.upper() == serie_norm) &
                         (df['Componente Curricular'].str.strip().str.upper() == componente_norm) &
                         (df['Bimestre'].str.strip().str.upper() == bimestre_norm) &
-                        (df['Tipo de Avaliação'].str.strip(
-                        ).str.upper() == tipo_avaliacao_norm)
+                        (df['Tipo de Avaliação'].str.strip().str.upper() == tipo_avaliacao_norm)
                     )
-                    nota_existente = float(
-                        df[cond]['Nota'].values[0]) if not df[cond].empty else 0.0
+                    nota_existente = float(df[cond]['Nota'].values[0]) if not df[cond].empty else 0.0
 
-                    # Ignorar se a nota não foi alterada (mesmo valor ou 0.0 sem intenção de sobrescrever)
+                    # Ignorar se a nota não foi alterada
                     if nota_valor == nota_existente or (nota_valor == 0.0 and nota_existente == 0.0):
                         continue
 
@@ -322,13 +320,22 @@ else:
                                 atualizados.append(
                                     f"Nota atualizada para {nome} ({matricula}): {nota_valor:.2f}")
                             except Exception as e:
-                                erros.append(
-                                    f"Erro ao atualizar nota para {nome} ({matricula}): {e}")
+                                erros.append(f"Erro ao atualizar nota para {nome} ({matricula}): {e}")
                         else:
                             erros.append(
                                 f"Nota já existe para {nome} ({matricula}). Marque 'Sobrescrever' para atualizar.")
                     else:
                         registros.append(nova_linha)
+
+                # Reinicializar o cliente antes de atualizar
+                try:
+                    client = authenticate_gsheets()
+                    st.session_state["client"] = client
+                    sheet_notas = client.open(SHEET_NAME).worksheet(WORKSHEET_NOTAS)
+                    st.session_state["sheet_notas"] = sheet_notas
+                except Exception as e:
+                    st.error(f"Erro ao reinicializar autenticação: {e}\n{traceback.format_exc()}")
+                    st.stop()
 
                 # Executar atualizações em lote
                 if batch_updates:
@@ -337,21 +344,17 @@ else:
                         for msg in atualizados:
                             st.success(msg)
                     except Exception as e:
-                        st.error(
-                            f"Erro ao atualizar notas em lote: {e}\n{traceback.format_exc()}")
+                        st.error(f"Erro ao atualizar notas em lote: {e}\n{traceback.format_exc()}")
                         st.stop()
 
                 # Adicionar novos registros
                 if registros:
                     try:
-                        sheet_notas.append_rows(
-                            registros, value_input_option="USER_ENTERED")
+                        sheet_notas.append_rows(registros, value_input_option="USER_ENTERED")
                         for reg in registros:
-                            st.success(
-                                f"Nota lançada para {reg[0]} ({reg[1]}): {reg[7]}")
+                            st.success(f"Nota lançada para {reg[0]} ({reg[1]}): {reg[7]}")
                     except Exception as e:
-                        st.error(
-                            f"Erro ao adicionar novas notas: {e}\n{traceback.format_exc()}")
+                        st.error(f"Erro ao adicionar novas notas: {e}\n{traceback.format_exc()}")
                         st.stop()
 
                 # Exibir erros, se houver
