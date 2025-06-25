@@ -1,3 +1,4 @@
+# Força redeploy - 25/06/2025
 import streamlit as st
 import pandas as pd
 import gspread
