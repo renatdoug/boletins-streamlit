@@ -1,4 +1,3 @@
-# Força redeploy - 25/06/2025
 import streamlit as st
 import pandas as pd
 import gspread
@@ -20,24 +19,37 @@ WORKSHEET_NOTAS = "Notas_Tabela"
 
 
 def authenticate_gsheets():
+    """Autentica com Google Sheets usando credenciais JSON."""
     try:
-        if os.path.exists("credenciais.json"):
-            credentials = Credentials.from_service_account_file(
-                "credenciais.json", scopes=SCOPE)
-        elif "google_credentials" in st.secrets:  # Alterado para minúsculas
-            credentials_info = st.secrets["google_credentials"]
+        # Localmente, tenta carregar credenciais.json
+        credentials_path = os.path.join(
+            os.path.dirname(__file__), "credenciais.json")
+        if os.path.exists(credentials_path):
+            with open(credentials_path, "r", encoding="utf-8") as f:
+                credentials_info = json.load(f)
+            credentials = Credentials.from_service_account_info(
+                credentials_info, scopes=SCOPE)
+        # No Streamlit Cloud, usa st.secrets
+        elif "GOOGLE_CREDENTIALS" in st.secrets:
+            credentials_info = st.secrets["GOOGLE_CREDENTIALS"]
             credentials = Credentials.from_service_account_info(
                 credentials_info, scopes=SCOPE)
         else:
-            st.error("Credenciais do Google Sheets não encontradas.")
+            st.error(
+                "Credenciais do Google Sheets não encontradas. "
+                "Verifique se 'credenciais.json' está no diretório do projeto "
+                "ou se 'GOOGLE_CREDENTIALS' está configurado no secrets.toml do Streamlit Cloud."
+            )
             st.stop()
         return gspread.authorize(credentials)
-    except Exception as e:
-        st.error(f"Erro ao autenticar com Google Sheets: {e}")
+    except json.JSONDecodeError as e:
+        st.error(
+            f"Erro ao ler o arquivo credenciais.json: Formato JSON inválido. {e}")
         st.stop()
-
-
-client = authenticate_gsheets()
+    except Exception as e:
+        st.error(
+            f"Erro ao autenticar com Google Sheets: {e}\n{traceback.format_exc()}")
+        st.stop()
 
 
 def clean_nota_value(value):
@@ -69,8 +81,8 @@ def load_data(worksheet_name, _cache_version=0):
         if df.empty:
             st.error("Planilha vazia.")
             st.stop()
-        required_cols = ['Série', 'Nome do Aluno', 'Matrícula', 'Bimestre',
-                         'Componente Curricular', 'Tipo de Avaliação', 'Nota']
+        required_cols = ['Série', 'Nome do Aluno', 'Matrícula',
+                         'Bimestre', 'Componente Curricular', 'Tipo de Avaliação', 'Nota']
         if not all(col in df.columns for col in required_cols):
             st.error("Colunas obrigatórias ausentes na planilha.")
             st.stop()
@@ -84,7 +96,7 @@ def load_data(worksheet_name, _cache_version=0):
         st.stop()
     except Exception as e:
         st.error(f"Erro ao acessar planilha: {e}\n{traceback.format_exc()}")
-        st.stop()
+        st.stopped()
 
 
 def validate_matricula(nome, matricula, alunos_serie):
@@ -128,7 +140,7 @@ def check_recuperacao_final(resultado, medias):
     recuperacao_rows = resultado[resultado['Tipo de Avaliação']
                                  == 'RECUPERAÇÃO']
     resultados = []
-    # Considera apenas componentes que precisaram de recuperação (média < 8)
+    # Considera apenas componentes que precisaram de recuperação precisa
     componentes_recuperacao = [comp for comp,
                                media in medias.items() if media < 8]
     for comp in componentes_recuperacao:
